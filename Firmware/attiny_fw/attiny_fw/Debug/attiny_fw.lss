@@ -1,0 +1,195 @@
+
+attiny_fw.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         0000009c  00000000  00000000  00000074  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         00000026  00800060  0000009c  00000110  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .comment      00000030  00000000  00000000  00000136  2**0
+                  CONTENTS, READONLY
+  3 .note.gnu.avr.deviceinfo 0000003c  00000000  00000000  00000168  2**2
+                  CONTENTS, READONLY
+  4 .debug_aranges 00000020  00000000  00000000  000001a4  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .debug_info   000004fa  00000000  00000000  000001c4  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_abbrev 000003e8  00000000  00000000  000006be  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_line   00000269  00000000  00000000  00000aa6  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_frame  00000024  00000000  00000000  00000d10  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_str    000002dd  00000000  00000000  00000d34  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_loc    000000c6  00000000  00000000  00001011  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 11 .debug_ranges 00000010  00000000  00000000  000010d7  2**0
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00000000 <__vectors>:
+   0:	09 c0       	rjmp	.+18     	; 0x14 <__ctors_end>
+   2:	19 c0       	rjmp	.+50     	; 0x36 <__bad_interrupt>
+   4:	18 c0       	rjmp	.+48     	; 0x36 <__bad_interrupt>
+   6:	17 c0       	rjmp	.+46     	; 0x36 <__bad_interrupt>
+   8:	16 c0       	rjmp	.+44     	; 0x36 <__bad_interrupt>
+   a:	15 c0       	rjmp	.+42     	; 0x36 <__bad_interrupt>
+   c:	14 c0       	rjmp	.+40     	; 0x36 <__bad_interrupt>
+   e:	13 c0       	rjmp	.+38     	; 0x36 <__bad_interrupt>
+  10:	12 c0       	rjmp	.+36     	; 0x36 <__bad_interrupt>
+  12:	11 c0       	rjmp	.+34     	; 0x36 <__bad_interrupt>
+
+00000014 <__ctors_end>:
+  14:	11 24       	eor	r1, r1
+  16:	1f be       	out	0x3f, r1	; 63
+  18:	cf e9       	ldi	r28, 0x9F	; 159
+  1a:	cd bf       	out	0x3d, r28	; 61
+
+0000001c <__do_copy_data>:
+  1c:	10 e0       	ldi	r17, 0x00	; 0
+  1e:	a0 e6       	ldi	r26, 0x60	; 96
+  20:	b0 e0       	ldi	r27, 0x00	; 0
+  22:	ec e9       	ldi	r30, 0x9C	; 156
+  24:	f0 e0       	ldi	r31, 0x00	; 0
+  26:	02 c0       	rjmp	.+4      	; 0x2c <__do_copy_data+0x10>
+  28:	05 90       	lpm	r0, Z+
+  2a:	0d 92       	st	X+, r0
+  2c:	a6 38       	cpi	r26, 0x86	; 134
+  2e:	b1 07       	cpc	r27, r17
+  30:	d9 f7       	brne	.-10     	; 0x28 <__do_copy_data+0xc>
+  32:	02 d0       	rcall	.+4      	; 0x38 <main>
+  34:	31 c0       	rjmp	.+98     	; 0x98 <_exit>
+
+00000036 <__bad_interrupt>:
+  36:	e4 cf       	rjmp	.-56     	; 0x0 <__vectors>
+
+00000038 <main>:
+	TCCR0B &= ~((1<<CS02)|(1<<CS01)|(1<<CS00)); // stop the timer
+}
+
+int main(void) {
+	/* setup */
+	DDRB |= _BV(PB1); // set pin as OUTPUT
+  38:	b9 9a       	sbi	0x17, 1	; 23
+	DDRB |= _BV(PB2); // set pin as OUTPUT
+  3a:	ba 9a       	sbi	0x17, 2	; 23
+
+	DDRB &= ~_BV(PB4); // set pin as INPUT
+  3c:	bc 98       	cbi	0x17, 4	; 23
+/*
+int ADC_Read = 0;
+*/
+
+static void pwm_init(void) {
+	DDRB |= _BV(PB0); // set PWM pin as OUTPUT
+  3e:	b8 9a       	sbi	0x17, 0	; 23
+	TCCR0A |= _BV(WGM01)|_BV(WGM00); // set timer mode to FAST PWM
+  40:	8f b5       	in	r24, 0x2f	; 47
+  42:	83 60       	ori	r24, 0x03	; 3
+  44:	8f bd       	out	0x2f, r24	; 47
+	TCCR0A |= _BV(COM0A1); // connect PWM signal to pin (AC0A => PB0)
+  46:	8f b5       	in	r24, 0x2f	; 47
+  48:	80 68       	ori	r24, 0x80	; 128
+  4a:	8f bd       	out	0x2f, r24	; 47
+ -> F(N_64)   = 73Hz
+ -> F(N_256)  = 18Hz
+ -> F(N_1024) = 4Hz
+*/
+static void pwm_set_frequency(uint32_t N) {
+	TCCR0B = (TCCR0B & ~((1 << CS02)|(1 << CS01)|(1 << CS00))) | N; // set prescaler
+  4c:	83 b7       	in	r24, 0x33	; 51
+  4e:	88 7f       	andi	r24, 0xF8	; 248
+  50:	82 60       	ori	r24, 0x02	; 2
+  52:	83 bf       	out	0x33, r24	; 51
+  54:	88 e8       	ldi	r24, 0x88	; 136
+  56:	90 e0       	ldi	r25, 0x00	; 0
+	pwm_set_frequency(N_8);
+
+	/* loop */
+	while (1) {
+		// Generate first 1/2 Cycle
+		PORTB |= _BV(PB1);
+  58:	c1 9a       	sbi	0x18, 1	; 24
+		PORTB &= ~_BV(PB2);
+  5a:	c2 98       	cbi	0x18, 2	; 24
+  5c:	e0 e6       	ldi	r30, 0x60	; 96
+  5e:	f0 e0       	ldi	r31, 0x00	; 0
+  60:	df 01       	movw	r26, r30
+
+		for(int i=0; i<20; i++) {
+			pwm_set_duty(sPWMArray2[i]);
+  62:	2c 91       	ld	r18, X
+  64:	12 96       	adiw	r26, 0x02	; 2
+static void pwm_set_frequency(uint32_t N) {
+	TCCR0B = (TCCR0B & ~((1 << CS02)|(1 << CS01)|(1 << CS00))) | N; // set prescaler
+}
+
+static void pwm_set_duty(uint8_t duty) {
+	OCR0A = duty; // set the OCRnx
+  66:	26 bf       	out	0x36, r18	; 54
+	#else
+		//round up by default
+		__ticks_dc = (uint32_t)(ceil(fabs(__tmp)));
+	#endif
+
+	__builtin_avr_delay_cycles(__ticks_dc);
+  68:	c7 e5       	ldi	r28, 0x57	; 87
+  6a:	d2 e0       	ldi	r29, 0x02	; 2
+  6c:	21 97       	sbiw	r28, 0x01	; 1
+  6e:	f1 f7       	brne	.-4      	; 0x6c <__SREG__+0x2d>
+  70:	00 c0       	rjmp	.+0      	; 0x72 <__SREG__+0x33>
+  72:	00 00       	nop
+	while (1) {
+		// Generate first 1/2 Cycle
+		PORTB |= _BV(PB1);
+		PORTB &= ~_BV(PB2);
+
+		for(int i=0; i<20; i++) {
+  74:	a8 17       	cp	r26, r24
+  76:	b9 07       	cpc	r27, r25
+  78:	a1 f7       	brne	.-24     	; 0x62 <__SREG__+0x23>
+			pwm_set_duty(sPWMArray2[i]);
+			_delay_us(500);
+		}
+
+		// Generate second 1/2 Cycle
+		PORTB &= ~_BV(PB1);
+  7a:	c1 98       	cbi	0x18, 1	; 24
+		PORTB |= _BV(PB2);
+  7c:	c2 9a       	sbi	0x18, 2	; 24
+		for(int i=0; i<20; i++) {
+			pwm_set_duty(sPWMArray2[i]);
+  7e:	20 81       	ld	r18, Z
+  80:	32 96       	adiw	r30, 0x02	; 2
+static void pwm_set_frequency(uint32_t N) {
+	TCCR0B = (TCCR0B & ~((1 << CS02)|(1 << CS01)|(1 << CS00))) | N; // set prescaler
+}
+
+static void pwm_set_duty(uint8_t duty) {
+	OCR0A = duty; // set the OCRnx
+  82:	26 bf       	out	0x36, r18	; 54
+  84:	a7 e5       	ldi	r26, 0x57	; 87
+  86:	b2 e0       	ldi	r27, 0x02	; 2
+  88:	11 97       	sbiw	r26, 0x01	; 1
+  8a:	f1 f7       	brne	.-4      	; 0x88 <__SREG__+0x49>
+  8c:	00 c0       	rjmp	.+0      	; 0x8e <__SREG__+0x4f>
+  8e:	00 00       	nop
+		}
+
+		// Generate second 1/2 Cycle
+		PORTB &= ~_BV(PB1);
+		PORTB |= _BV(PB2);
+		for(int i=0; i<20; i++) {
+  90:	e8 17       	cp	r30, r24
+  92:	f9 07       	cpc	r31, r25
+  94:	a1 f7       	brne	.-24     	; 0x7e <__SREG__+0x3f>
+  96:	e0 cf       	rjmp	.-64     	; 0x58 <__SREG__+0x19>
+
+00000098 <_exit>:
+  98:	f8 94       	cli
+
+0000009a <__stop_program>:
+  9a:	ff cf       	rjmp	.-2      	; 0x9a <__stop_program>
